@@ -1,0 +1,5 @@
+{
+  "name": "V1 AXIOM",
+  "description": "The Alternate Physics Compiler - A Reality IDE interacting with the Gemini API to generate 3D simulations.",
+  "requestFramePermissions": []
+}
