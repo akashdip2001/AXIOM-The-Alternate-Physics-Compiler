@@ -31,7 +31,24 @@ export const generateSimulation = async (prompt: string): Promise<SimulationCode
     if (!text) throw new Error("No response from Gemini");
 
     const data = JSON.parse(text) as SimulationCode;
-    return data;
+
+    // --- 🛡️ THE SANITIZER FIX 🛡️ ---
+    // 1. Remove markdown code blocks
+    let sanitizedCode = data.code.replace(/```(javascript|js)?/g, '').replace(/```/g, '');
+
+    // 2. FORCEFULLY remove forbidden variable declarations
+    // This regex deletes "const scene = ..." and "var scene = ..." etc.
+    sanitizedCode = sanitizedCode.replace(/(const|var|let)\s+(scene|camera|renderer)\s*=\s*new\s+THREE\.(Scene|PerspectiveCamera|WebGLRenderer)\(.*\);?/gi, '');
+
+    // 3. Remove "return" if it returns scene/camera/renderer explicitly (optional, but safe)
+    // (The AI sometimes tries to return them, which is fine, but we clean just in case)
+
+    console.log("Sanitized Code:", sanitizedCode); // Debugging: Check console to see if lines are gone
+
+    return {
+      code: sanitizedCode,
+      explanation: data.explanation
+    };
 
   } catch (error) {
     console.error("Gemini Generation Error:", error);
