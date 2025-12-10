@@ -58,7 +58,7 @@ flowchart LR
     Step1 --> Step2{Remove Declarations}
     Step2 -->|Regex: const scene = ...| Clean[Clean Code Body]
     Clean --> Step3{Injection}
-    Step3 -->|Function Body| Execution[new Function(scene, ...)]
+    Step3 -->|Function Body| Execution["new Function(scene, ...)"]
 ```
 
 ### UX State Machine
