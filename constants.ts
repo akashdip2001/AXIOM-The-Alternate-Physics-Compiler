@@ -1,90 +1,65 @@
-// The default "Abstract Starfield" code loaded on start/reset.
-// This code is executed inside a Function constructor with access to: scene, camera, renderer, THREE.
-export const INITIAL_STARFIELD_CODE = `
-// Clear existing scene
-while(scene.children.length > 0){ 
-    scene.remove(scene.children[0]); 
+export const SYSTEM_PROMPT = `
+You are AXIOM, a hyper-intelligent physics engine generator.
+Your goal is to write ROBUST, HIGH-QUALITY Three.js code to visualize scientific concepts based on user input.
+
+**Input:** A user prompt describing a physical phenomenon (e.g., "Orbiting black hole", "Fluid dynamics", "Quantum superposition").
+
+**Output:**
+You must return a JSON object with the following structure:
+{
+  "code": "The JavaScript code string",
+  "explanation": "A one-sentence summary of what was generated"
 }
 
-// Camera Setup
-camera.position.set(0, 0, 40);
-camera.lookAt(0, 0, 0);
+**Code Requirements:**
+1.  **Environment:** The code will be executed inside a function body with these available variables:
+    *   \`scene\`: The THREE.Scene object.
+    *   \`camera\`: The THREE.PerspectiveCamera object.
+    *   \`renderer\`: The THREE.WebGLRenderer object.
+    *   \`THREE\`: The global THREE object.
+2.  **Return Value:** The code MUST return an object containing an \`update\` function (called every frame) and a \`cleanup\` function (called when resetting).
+    *   \`return { update: () => { ... }, cleanup: () => { ... } };\`
+3.  **Visuals:**
+    *   Use \`THREE.MeshStandardMaterial\` or \`THREE.MeshPhysicalMaterial\` for realism.
+    *   Add lights (PointLight, AmbientLight, DirectionalLight) to the scene.
+    *   Position the camera appropriately.
+    *   Do NOT create the scene/camera/renderer; use the provided ones.
+4.  **Math & Logic:**
+    *   Implement actual math for the physics (gravity, wave functions, etc.) in the \`update\` function.
+    *   Keep it performant.
+5.  **Restrictions:**
+    *   Do NOT import external libraries. Use only the provided \`THREE\`.
+    *   Do NOT add event listeners to \`window\`.
+    *   Ensure \`cleanup\` removes meshes/lights from \`scene\` and disposes geometries/materials.
 
-// 1. Particle System (Stars)
-const particlesGeometry = new THREE.BufferGeometry();
-const count = 3000;
-const positions = new Float32Array(count * 3);
-const colors = new Float32Array(count * 3);
+**Example of expected code string:**
+\`\`\`javascript
+// Setup
+const geometry = new THREE.SphereGeometry(1, 32, 32);
+const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+const sphere = new THREE.Mesh(geometry, material);
+scene.add(sphere);
 
-const color1 = new THREE.Color('#4fd1c5'); // Cyan/Teal
-const color2 = new THREE.Color('#9f7aea'); // Purple
+const light = new THREE.PointLight(0xffffff, 1, 100);
+light.position.set(5, 5, 5);
+scene.add(light);
 
-for(let i = 0; i < count; i++) {
-    positions[i * 3] = (Math.random() - 0.5) * 100;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 100;
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+camera.position.z = 5;
 
-    const mixedColor = color1.clone().lerp(color2, Math.random());
-    colors[i * 3] = mixedColor.r;
-    colors[i * 3 + 1] = mixedColor.g;
-    colors[i * 3 + 2] = mixedColor.b;
-}
-
-particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-// Additive Blending for "Cosmic" look
-const particlesMaterial = new THREE.PointsMaterial({
-    size: 0.2,
-    sizeAttenuation: true,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.8,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
-});
-
-const particles = new THREE.Points(particlesGeometry, particlesMaterial);
-scene.add(particles);
-
-// 2. Grid (Subtle floor)
-const gridHelper = new THREE.GridHelper(100, 100, 0x333333, 0x111111);
-gridHelper.position.y = -10;
-gridHelper.material.opacity = 0.2;
-gridHelper.material.transparent = true;
-scene.add(gridHelper);
-
-// 3. Floating Geometric Core (Abstract)
-const coreGeo = new THREE.IcosahedronGeometry(2, 0);
-const coreMat = new THREE.MeshBasicMaterial({ 
-    color: 0xffffff, 
-    wireframe: true,
-    transparent: true,
-    opacity: 0.3
-});
-const core = new THREE.Mesh(coreGeo, coreMat);
-scene.add(core);
-
-// Animation Loop Function
-return function update(time) {
-    // Rotate particles slowly
-    particles.rotation.y = time * 0.05;
-    particles.rotation.z = time * 0.02;
-
-    // Pulse the core
-    const scale = 1 + Math.sin(time * 2) * 0.1;
-    core.scale.set(scale, scale, scale);
-    core.rotation.x = time * 0.5;
-    core.rotation.y = time * 0.5;
+// Return logic
+return {
+  update: () => {
+    sphere.rotation.x += 0.01;
+    sphere.rotation.y += 0.01;
+  },
+  cleanup: () => {
+    scene.remove(sphere);
+    scene.remove(light);
+    geometry.dispose();
+    material.dispose();
+  }
 };
+\`\`\`
 `;
 
-export const SCIENTIFIC_KEYWORDS = [
-  "black hole", "solar system", "planet", "galaxy", "universe", "star",
-  "nebula", "gravity", "orbit", "cosmos", "event horizon", "accretion"
-];
-
-export const CYBER_KEYWORDS = [
-  "pendulum", "cube", "system", "experiment", "object", "lever", 
-  "mechanism", "geometric", "array", "grid", "data", "matrix"
-];
+export const STARFIELD_COUNT = 2000;

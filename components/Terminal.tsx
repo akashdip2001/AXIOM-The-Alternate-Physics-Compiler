@@ -1,107 +1,130 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LogMessage } from '../types';
+import { Terminal as TerminalIcon, Play, RefreshCw, StopCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { AppMode, TerminalLog } from '../types';
 
 interface TerminalProps {
+  mode: AppMode;
+  logs: TerminalLog[];
   onCompile: (prompt: string) => void;
   onReset: () => void;
-  logs: LogMessage[];
-  isProcessing: boolean;
+  onPause: () => void;
+  onResume: () => void;
 }
 
-const Terminal: React.FC<TerminalProps> = ({ onCompile, onReset, logs, isProcessing }) => {
+const Terminal: React.FC<TerminalProps> = ({ mode, logs, onCompile, onReset, onPause, onResume }) => {
   const [input, setInput] = useState('');
-  const logEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll logs
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
   }, [logs]);
+
+  // Focus input on load and reset
+  useEffect(() => {
+    if (mode === AppMode.IDLE || mode === AppMode.PAUSED) {
+        inputRef.current?.focus();
+    }
+  }, [mode]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isProcessing) return;
+    if (!input.trim()) return;
     onCompile(input);
     setInput('');
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e as any);
-    }
-  };
+  const isSimulating = mode === AppMode.ACTIVE;
+  const isPaused = mode === AppMode.PAUSED;
+  const isLoading = mode === AppMode.LOADING;
 
   return (
-    <div className="w-full h-full flex flex-col p-6 text-white font-mono select-none pointer-events-auto">
-      {/* Header */}
-      <div className="mb-6 animate-pulse">
-        <h1 className="text-4xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">
-          AXIOM
-        </h1>
-        <div className="text-xs text-cyan-500/70 mt-1 uppercase tracking-widest">
-          Alternate Physics Compiler v4.0
+    <div className="absolute bottom-0 left-0 right-0 p-6 flex flex-col items-center justify-end pointer-events-none z-20 h-screen">
+      
+      {/* Logs Display (Visible in IDLE and PAUSED, optional in ACTIVE if errors) */}
+      {(mode !== AppMode.ACTIVE) && (
+        <div 
+            ref={scrollRef}
+            className="w-full max-w-2xl mb-4 max-h-[30vh] overflow-y-auto pointer-events-auto bg-axiom-black/80 backdrop-blur-md border border-axiom-border rounded-lg p-4 font-mono text-xs sm:text-sm shadow-2xl transition-all duration-500 ease-in-out"
+        >
+            {logs.map((log) => (
+            <div key={log.id} className={`mb-1 ${
+                log.type === 'error' ? 'text-red-400' : 
+                log.type === 'success' ? 'text-axiom-green' : 
+                log.type === 'system' ? 'text-axiom-cyan' : 'text-gray-400'
+            }`}>
+                <span className="opacity-50 mr-2">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
+                <span>{log.message}</span>
+            </div>
+            ))}
+            {logs.length === 0 && <div className="text-gray-600 italic">Ready for input...</div>}
         </div>
-      </div>
+      )}
 
-      {/* Logs Display */}
-      <div className="flex-grow mb-4 overflow-y-auto bg-black/40 backdrop-blur-sm rounded-lg border border-white/10 p-4 text-sm shadow-inner">
-        {logs.length === 0 && (
-          <div className="text-gray-500 italic">System ready. Awaiting input...</div>
-        )}
-        {logs.map((log) => (
-          <div key={log.id} className="mb-2 break-words">
-            <span className="opacity-50 text-xs mr-2">[{log.timestamp}]</span>
-            <span className={
-              log.type === 'error' ? 'text-red-400' :
-              log.type === 'success' ? 'text-green-400' :
-              log.type === 'system' ? 'text-yellow-400' :
-              'text-cyan-200'
-            }>
-              {log.type === 'system' && '> '}
-              {log.text}
-            </span>
+      {/* Control Bar / Input Area */}
+      <div className="w-full max-w-2xl pointer-events-auto flex items-center gap-3">
+        
+        {/* Main Input Form */}
+        <form 
+            onSubmit={handleSubmit}
+            className={`flex-1 flex items-center bg-axiom-black/90 backdrop-blur-xl border ${
+                isLoading ? 'border-axiom-cyan animate-pulse' : 'border-axiom-border'
+            } rounded-lg overflow-hidden shadow-2xl transition-all duration-300 group focus-within:border-axiom-cyan`}
+        >
+          <div className="px-4 text-axiom-cyan">
+             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <TerminalIcon className="w-5 h-5" />}
           </div>
-        ))}
-        <div ref={logEndRef} />
-      </div>
-
-      {/* Input Area */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div className="relative group">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 to-purple-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
-          <textarea
+          <input
+            ref={inputRef}
+            type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Describe a physical system (e.g., 'A binary star system' or 'A chaotic double pendulum')..."
-            className="relative w-full bg-black/80 text-cyan-50 border border-white/10 rounded-lg p-3 focus:outline-none focus:border-cyan-500/50 transition-colors resize-none h-24 text-sm"
-            disabled={isProcessing}
+            disabled={isLoading}
+            placeholder={
+                mode === AppMode.ACTIVE ? "Simulation running..." :
+                mode === AppMode.PAUSED ? "Enter new prompt to reset..." :
+                "Enter physics concept (e.g. 'Double Slit Experiment')..."
+            }
+            className="flex-1 bg-transparent border-none text-axiom-text py-4 px-2 focus:ring-0 focus:outline-none font-mono placeholder-gray-600"
           />
-        </div>
+          <button 
+            type="submit" 
+            disabled={isLoading || !input.trim()}
+            className="px-6 py-4 bg-axiom-glass hover:bg-axiom-border text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            {isLoading ? "GENERATING..." : "COMPILE"}
+          </button>
+        </form>
 
-        <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={isProcessing || !input.trim()}
-            className={`flex-1 py-3 rounded-lg font-bold tracking-wider text-sm transition-all duration-300 transform 
-              ${isProcessing 
-                ? 'bg-gray-800 text-gray-500 cursor-not-allowed' 
-                : 'bg-white/10 hover:bg-white/20 text-cyan-400 hover:text-white border border-cyan-500/30 hover:shadow-[0_0_15px_rgba(34,211,238,0.4)] active:scale-95'
-              }`}
-          >
-            {isProcessing ? 'COMPILING...' : 'COMPILE SIMULATION'}
-          </button>
-          
-          <button
-            type="button"
-            onClick={onReset}
-            disabled={isProcessing}
-            className="px-6 py-3 rounded-lg font-bold text-sm bg-red-900/20 text-red-400 border border-red-500/30 hover:bg-red-900/40 hover:text-red-200 transition-all active:scale-95"
-          >
-            RESET
-          </button>
-        </div>
-      </form>
+        {/* Action Buttons */}
+        {isSimulating && (
+            <button
+                onClick={onPause}
+                className="bg-axiom-black/90 border border-axiom-border hover:border-axiom-cyan text-white p-4 rounded-lg shadow-lg hover:shadow-axiom-cyan/20 transition-all duration-300 group"
+                title="Pause / Inspect"
+            >
+                <StopCircle className="w-5 h-5 group-hover:text-axiom-cyan" />
+            </button>
+        )}
+
+        {(isPaused) && (
+             <button
+                onClick={onResume}
+                className="bg-axiom-black/90 border border-axiom-border hover:border-axiom-green text-white p-4 rounded-lg shadow-lg hover:shadow-axiom-green/20 transition-all duration-300 group"
+                title="Resume Simulation"
+            >
+                <Play className="w-5 h-5 group-hover:text-axiom-green" />
+            </button>
+        )}
+      </div>
+      
+      {/* Footer Info */}
+      <div className="mt-2 text-gray-600 text-xs font-mono uppercase tracking-widest">
+        AXIOM ENGINE v2.5 // {mode} MODE
+      </div>
     </div>
   );
 };

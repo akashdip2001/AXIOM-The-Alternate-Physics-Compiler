@@ -1,16 +1,18 @@
-export interface LogMessage {
-  id: string;
-  timestamp: string;
-  type: 'info' | 'success' | 'error' | 'system';
-  text: string;
+export enum AppMode {
+  IDLE = 'IDLE',       // State A: Starfield
+  ACTIVE = 'ACTIVE',   // State B: Simulation Running
+  PAUSED = 'PAUSED',   // State C: Frozen Sim + Wireframe Overlay
+  LOADING = 'LOADING'  // Processing Gemini Request
 }
 
-export enum RenderStyle {
-  SCIENTIFIC = 'SCIENTIFIC',
-  CYBER = 'CYBER',
-}
-
-export interface SimulationConfig {
+export interface SimulationCode {
   code: string;
-  style: RenderStyle;
+  explanation: string;
+}
+
+export interface TerminalLog {
+  id: string;
+  type: 'info' | 'success' | 'error' | 'system';
+  message: string;
+  timestamp: number;
 }

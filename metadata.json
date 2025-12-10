@@ -1,5 +1,5 @@
 {
-  "name": "V5 AXIOM",
-  "description": "An alternate physics compiler that generates interactive 3D simulations using Gemini.",
+  "name": "V5 AXIOM: Reality Engine",
+  "description": "A generative physics engine that interprets natural language into real-time 3D simulations using Gemini 2.5 and Three.js.",
   "requestFramePermissions": []
 }
