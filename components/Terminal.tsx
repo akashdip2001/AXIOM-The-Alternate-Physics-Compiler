@@ -1,140 +1,107 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Terminal as TerminalIcon, Play, RefreshCw, AlertCircle, CheckCircle2, Command } from 'lucide-react';
-import { LogEntry, AppState } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { LogMessage } from '../types';
 
 interface TerminalProps {
-  logs: LogEntry[];
-  appState: AppState;
   onCompile: (prompt: string) => void;
+  onReset: () => void;
+  logs: LogMessage[];
+  isProcessing: boolean;
 }
 
-const Terminal: React.FC<TerminalProps> = ({ logs, appState, onCompile }) => {
+const Terminal: React.FC<TerminalProps> = ({ onCompile, onReset, logs, isProcessing }) => {
   const [input, setInput] = useState('');
-  const logContainerRef = useRef<HTMLDivElement>(null);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll logs
   useEffect(() => {
-    if (logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
+    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || appState === AppState.COMPILING) return;
+    if (!input.trim() || isProcessing) return;
     onCompile(input);
     setInput('');
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as any);
+    }
+  };
+
   return (
-    // MAIN CONTAINER: pointer-events-none ensures clicks pass through to the 3D scene
-    <div className="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-6 md:p-10 max-w-7xl mx-auto w-full">
-      
-      {/* HEADER */}
-      <div className="flex items-start justify-between">
-        <div className="pointer-events-auto bg-black/80 backdrop-blur-md border border-white/10 p-4 rounded-sm shadow-2xl">
-          <h1 className="text-white font-['Fira_Code'] font-bold text-xl tracking-tighter flex items-center gap-3">
-            <TerminalIcon className="w-5 h-5 text-emerald-400" />
-            AXIOM <span className="text-white/40 text-sm font-normal">v3.1.0</span>
-          </h1>
-          <p className="text-white/40 text-xs font-mono mt-1 ml-8">
-            ALTERNATE PHYSICS COMPILER
-          </p>
-        </div>
-        
-        {/* STATUS INDICATOR */}
-        <div className="pointer-events-auto bg-black/80 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${
-            appState === AppState.COMPILING ? 'bg-amber-400 animate-pulse' :
-            appState === AppState.ERROR ? 'bg-red-500' :
-            appState === AppState.RUNNING ? 'bg-emerald-500' : 'bg-blue-500'
-          }`} />
-          <span className="text-white/70 text-xs font-mono font-bold">
-            {appState}
-          </span>
+    <div className="w-full h-full flex flex-col p-6 text-white font-mono select-none pointer-events-auto">
+      {/* Header */}
+      <div className="mb-6 animate-pulse">
+        <h1 className="text-4xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">
+          AXIOM
+        </h1>
+        <div className="text-xs text-cyan-500/70 mt-1 uppercase tracking-widest">
+          Alternate Physics Compiler v4.0
         </div>
       </div>
 
-      {/* BOTTOM PANEL: CONTROLS & LOGS */}
-      <div className="flex flex-col md:flex-row gap-6 items-end">
-        
-        {/* LOG WINDOW */}
-        <div className="pointer-events-auto w-full md:w-1/3 h-48 bg-black/80 backdrop-blur-md border border-white/10 rounded-sm flex flex-col overflow-hidden shadow-2xl order-2 md:order-1 transition-all hover:border-white/20">
-          <div className="bg-white/5 px-3 py-1 flex items-center justify-between border-b border-white/5">
-            <span className="text-[10px] uppercase font-mono text-white/40 tracking-wider">Syslog</span>
-            <div className="flex gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-white/20" />
-              <div className="w-2 h-2 rounded-full bg-white/20" />
-            </div>
+      {/* Logs Display */}
+      <div className="flex-grow mb-4 overflow-y-auto bg-black/40 backdrop-blur-sm rounded-lg border border-white/10 p-4 text-sm shadow-inner">
+        {logs.length === 0 && (
+          <div className="text-gray-500 italic">System ready. Awaiting input...</div>
+        )}
+        {logs.map((log) => (
+          <div key={log.id} className="mb-2 break-words">
+            <span className="opacity-50 text-xs mr-2">[{log.timestamp}]</span>
+            <span className={
+              log.type === 'error' ? 'text-red-400' :
+              log.type === 'success' ? 'text-green-400' :
+              log.type === 'system' ? 'text-yellow-400' :
+              'text-cyan-200'
+            }>
+              {log.type === 'system' && '> '}
+              {log.text}
+            </span>
           </div>
-          <div ref={logContainerRef} className="flex-1 overflow-y-auto p-3 space-y-2 font-mono text-xs">
-            {logs.length === 0 && (
-              <div className="text-white/20 italic">Awaiting input stream...</div>
-            )}
-            {logs.map((log) => (
-              <div key={log.id} className="flex gap-2 animate-in fade-in slide-in-from-bottom-1 duration-300">
-                <span className="text-white/30 shrink-0">[{log.timestamp}]</span>
-                <span className={`${
-                  log.type === 'error' ? 'text-red-400' :
-                  log.type === 'success' ? 'text-emerald-400' :
-                  log.type === 'system' ? 'text-blue-400' : 'text-white/80'
-                }`}>
-                  {log.type === 'error' && 'ERR: '}
-                  {log.message}
-                </span>
-              </div>
-            ))}
-          </div>
+        ))}
+        <div ref={logEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 to-purple-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Describe a physical system (e.g., 'A binary star system' or 'A chaotic double pendulum')..."
+            className="relative w-full bg-black/80 text-cyan-50 border border-white/10 rounded-lg p-3 focus:outline-none focus:border-cyan-500/50 transition-colors resize-none h-24 text-sm"
+            disabled={isProcessing}
+          />
         </div>
 
-        {/* INPUT TERMINAL */}
-        <div className="pointer-events-auto w-full md:w-2/3 bg-black/90 backdrop-blur-xl border border-white/20 rounded-sm p-1 shadow-2xl order-1 md:order-2">
-          <form onSubmit={handleSubmit} className="flex gap-2 p-1">
-            <div className="flex-1 relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                <Command className="w-4 h-4 text-white/50" />
-              </div>
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Describe a physical system (e.g., 'A binary black hole system with accretion disks')"
-                className="w-full bg-white/5 border border-white/10 rounded-sm py-3 pl-10 pr-4 text-white font-mono text-sm focus:outline-none focus:border-emerald-500/50 focus:bg-white/10 transition-all placeholder:text-white/20"
-                disabled={appState === AppState.COMPILING}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={appState === AppState.COMPILING}
-              className={`px-6 rounded-sm font-bold text-sm tracking-wide uppercase transition-all flex items-center gap-2 ${
-                appState === AppState.COMPILING
-                  ? 'bg-amber-500/20 text-amber-500 cursor-not-allowed border border-amber-500/50'
-                  : 'bg-white text-black hover:bg-emerald-400 hover:text-black border border-white'
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            disabled={isProcessing || !input.trim()}
+            className={`flex-1 py-3 rounded-lg font-bold tracking-wider text-sm transition-all duration-300 transform 
+              ${isProcessing 
+                ? 'bg-gray-800 text-gray-500 cursor-not-allowed' 
+                : 'bg-white/10 hover:bg-white/20 text-cyan-400 hover:text-white border border-cyan-500/30 hover:shadow-[0_0_15px_rgba(34,211,238,0.4)] active:scale-95'
               }`}
-            >
-              {appState === AppState.COMPILING ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Proc
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4 fill-current" />
-                  Compile
-                </>
-              )}
-            </button>
-          </form>
-          <div className="px-2 pb-1 pt-2 flex justify-between items-center">
-             <span className="text-[10px] text-white/30 font-mono uppercase tracking-widest">
-               Gemini 2.5 Flash Engine Connected
-             </span>
-             <span className="text-[10px] text-white/30 font-mono">
-               Press Enter to Execute
-             </span>
-          </div>
+          >
+            {isProcessing ? 'COMPILING...' : 'COMPILE SIMULATION'}
+          </button>
+          
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={isProcessing}
+            className="px-6 py-3 rounded-lg font-bold text-sm bg-red-900/20 text-red-400 border border-red-500/30 hover:bg-red-900/40 hover:text-red-200 transition-all active:scale-95"
+          >
+            RESET
+          </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 };

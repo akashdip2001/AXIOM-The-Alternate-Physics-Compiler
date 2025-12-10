@@ -1,87 +1,92 @@
 import { GoogleGenAI } from "@google/genai";
+import { RenderStyle } from "../types";
+import { SCIENTIFIC_KEYWORDS, CYBER_KEYWORDS } from "../constants";
 
-const SYSTEM_INSTRUCTION = `
-You are AXIOM, a specialized 3D physics engine compiler.
-Your goal is to translate natural language descriptions into RAW, EXECUTABLE JavaScript code for a Three.js environment.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-### CONTEXT
-- You are provided with these variables in scope: 'scene', 'camera', 'renderer', 'controls', 'THREE'.
-- You must return an object with two methods:
-  1. \`update(time, delta)\`: Called every frame.
-  2. \`cleanup()\` : Called when the simulation stops to dispose geometries/materials.
-
-### RENDERING MANDATES (SCIENTIFIC REALISM)
-- **Style**: Photorealistic, cinematic, high-contrast. Avoid cartoon colors. Use MeshStandardMaterial or MeshPhysicalMaterial.
-- **Lighting**: Always set up dramatic lighting (Ambient + Point/Directional) if not present.
-- **Black Holes**: If requested, you MUST create:
-  - An Event Horizon (Black Sphere).
-  - An Accretion Disk (Flattened Ring/Torus) with subtle gradients or particles using AdditiveBlending.
-  - Relativistic Jets (if active) emitting from poles.
-  - No gravitational lensing shader required (too complex for this context), but simulate the *look* with geometry.
-- **Pendulums**: Use robust physics (e.g., simple harmonic motion or Verlet integration) to prevent exploding simulations. Use thin metallic lines (LineBasicMaterial) and heavy metallic bobs.
-
-### OUTPUT FORMAT
-- Return ONLY the function body code. 
-- DO NOT wrap in markdown blocks. 
-- DO NOT add explanations.
-- The code must end with: \`return { update, cleanup };\`
-
-### EXAMPLE OUTPUT PATTERN
-\`\`\`javascript
-// Setup
-const geometry = new THREE.BoxGeometry();
-const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-const cube = new THREE.Mesh(geometry, material);
-scene.add(cube);
-
-const light = new THREE.PointLight(0xffffff, 1, 100);
-light.position.set(10, 10, 10);
-scene.add(light);
-
-// Update function
-function update(time, delta) {
-  cube.rotation.x += delta;
-  cube.rotation.y += delta;
-}
-
-// Cleanup function
-function cleanup() {
-  scene.remove(cube);
-  geometry.dispose();
-  material.dispose();
-}
-
-return { update, cleanup };
-\`\`\`
-`;
-
-export const compileSimulation = async (prompt: string): Promise<string> => {
-  if (!process.env.API_KEY) {
-    throw new Error("API_KEY is missing in environment variables.");
+// Heuristic to determine simulation style
+export const detectStyle = (prompt: string): RenderStyle => {
+  const lower = prompt.toLowerCase();
+  
+  // Check Scientific keywords
+  if (SCIENTIFIC_KEYWORDS.some(k => lower.includes(k))) {
+    return RenderStyle.SCIENTIFIC;
+  }
+  
+  // Check Cyber keywords
+  if (CYBER_KEYWORDS.some(k => lower.includes(k))) {
+    return RenderStyle.CYBER;
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Default to Cyber if ambiguous (cleaner for general requests)
+  return RenderStyle.CYBER;
+};
+
+export const generateSimulationCode = async (userPrompt: string, style: RenderStyle): Promise<string> => {
+  const isScientific = style === RenderStyle.SCIENTIFIC;
+
+  const styleInstruction = isScientific
+    ? `STYLE: SCIENTIFIC REALISM. 
+       - Use PBR materials (MeshStandardMaterial, MeshPhysicalMaterial).
+       - Lighting must be realistic (PointLights, AmbientLight is low).
+       - Use particle systems for accretion disks or stars.
+       - Colors: Deep blacks, realistic star temperatures, high dynamic range.
+       - If a black hole is requested, create an accretion disk and gravitational lensing effect using torus/particles.
+       - Background should be black.`
+    : `STYLE: CYBER-AESTHETIC.
+       - Use Basic or Lambert materials.
+       - Colors: Neon Cyan (0x00ffff), Bright Magenta (0xff00ff), Electric Blue.
+       - High contrast. Use wireframes or simple geometric primitives.
+       - Make connections visible (thin lines).
+       - Background should be deep black.
+       - Prioritize clarity over realism.`;
+
+  const systemInstruction = `
+    You are AXIOM, a Three.js Physics Compiler.
+    Your task is to convert the User's Request into a VALID JavaScript code block that utilizes the Three.js library.
+    
+    EXECUTION CONTEXT:
+    - You do NOT need to import THREE. It is available globally as 'THREE'.
+    - You do NOT need to create the scene, camera, or renderer. They are passed to you as variables: 'scene', 'camera', 'renderer'.
+    - 'camera' is a THREE.PerspectiveCamera.
+    - 'scene' is a THREE.Scene.
+    - 'renderer' is a THREE.WebGLRenderer.
+    
+    REQUIREMENTS:
+    1. Reset the scene content at the start of your code: 'while(scene.children.length > 0){ scene.remove(scene.children[0]); }'.
+    2. Setup lighting, meshes, materials, and geometries based on the User's Request.
+    3. Position the camera appropriately (e.g., camera.position.set(...); camera.lookAt(0,0,0);).
+    4. **CRITICAL**: The last part of your code MUST return a function 'update(time)'.
+       - This function will be called every frame.
+       - 'time' is the elapsed time in seconds.
+       - Use this function to animate objects (rotation, position updates).
+    5. ${styleInstruction}
+    
+    OUTPUT FORMAT:
+    - Return ONLY the raw JavaScript code. 
+    - DO NOT wrap in markdown code blocks (no \`\`\`js).
+    - DO NOT add explanations or text outside the code.
+  `;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: userPrompt,
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.4, // Lower temperature for more deterministic/stable code
-        topP: 0.95,
-        topK: 40,
+        systemInstruction: systemInstruction,
+        temperature: 0.7,
+        maxOutputTokens: 2000,
       }
     });
 
-    let code = response.text || '';
+    let code = response.text || "";
     
-    // Clean up potential markdown code fences if the model ignores instructions
-    code = code.replace(/```javascript/g, '').replace(/```js/g, '').replace(/```/g, '').trim();
+    // Cleanup if model ignores instruction and adds markdown
+    code = code.replace(/```javascript/g, '').replace(/```js/g, '').replace(/```/g, '');
     
     return code;
-  } catch (error: any) {
-    console.error("Gemini compilation failed:", error);
-    throw new Error(`Compilation failed: ${error.message || "Unknown error"}`);
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    throw new Error("Failed to compile physics simulation.");
   }
 };

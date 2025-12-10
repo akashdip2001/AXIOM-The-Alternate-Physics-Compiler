@@ -1,5 +1,5 @@
 {
-  "name": "V4 AXIOM: The Alternate Physics Compiler",
-  "description": "A Generative AI environment that compiles natural language into interactive 3D physics simulations with scientific realism.",
+  "name": "V5 AXIOM",
+  "description": "An alternate physics compiler that generates interactive 3D simulations using Gemini.",
   "requestFramePermissions": []
 }
