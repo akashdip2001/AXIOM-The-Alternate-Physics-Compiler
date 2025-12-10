@@ -1,5 +1,5 @@
 {
-  "name": "V2 AXIOM: The Alternate Physics Compiler",
-  "description": "A high-end 'Reality IDE' that uses Gemini to compile natural language into interactive, 3D cyberpunk simulations using Three.js.",
+  "name": "V3 AXIOM: The Alternate Physics Compiler",
+  "description": "A minimalist sci-fi environment that compiles natural language physics scenarios into photorealistic 3D visualizations using the Gemini API and Three.js.",
   "requestFramePermissions": []
 }

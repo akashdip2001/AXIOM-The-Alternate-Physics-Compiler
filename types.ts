@@ -6,21 +6,14 @@ export enum LogType {
   SYSTEM = 'SYSTEM'
 }
 
-export interface LogEntry {
+export interface LogMessage {
   id: string;
   timestamp: string;
-  message: string;
   type: LogType;
+  message: string;
 }
 
-export interface CompilationResult {
+export interface GenerationResult {
   code: string;
-  success: boolean;
-  error?: string;
-}
-
-export interface SimulationConfig {
-  prompt: string;
-  generatedCode: string | null;
-  status: 'idle' | 'compiling' | 'active' | 'error';
+  explanation?: string;
 }

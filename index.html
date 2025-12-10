@@ -1,76 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AXIOM: Reality Compiler</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AXIOM: The Alternate Physics Compiler</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              axiom: {
-                black: '#050505',
-                cyan: '#00f3ff',
-                magenta: '#ff00ff',
-                amber: '#ffbf00',
-                glass: 'rgba(10, 10, 10, 0.7)',
-              }
-            },
-            fontFamily: {
-              mono: ['"Fira Code"', 'monospace'],
-              sans: ['"Inter"', 'sans-serif'],
-            },
-            animation: {
-              'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              'glow': 'glow 2s ease-in-out infinite alternate',
-            },
-            keyframes: {
-              glow: {
-                '0%': { boxShadow: '0 0 5px #00f3ff20' },
-                '100%': { boxShadow: '0 0 20px #00f3ff60, 0 0 10px #00f3ff' }
-              }
-            }
-          }
-        }
-      }
-    </script>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Inter:wght@300;400;600&display=swap');
+      
       body {
-        background-color: #050505;
+        margin: 0;
+        background-color: #000000;
+        font-family: 'Inter', sans-serif;
         color: #e0e0e0;
         overflow: hidden;
       }
+      
       /* Custom Scrollbar for Terminal */
       ::-webkit-scrollbar {
         width: 6px;
       }
       ::-webkit-scrollbar-track {
-        background: #0a0a0a; 
+        background: rgba(255, 255, 255, 0.05);
       }
       ::-webkit-scrollbar-thumb {
-        background: #333; 
+        background: rgba(255, 255, 255, 0.2);
         border-radius: 3px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #00f3ff; 
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .font-mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      /* Glassmorphism Utilities */
+      .glass-panel {
+        background: rgba(10, 10, 12, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
       }
     </style>
   <script type="importmap">
 {
   "imports": {
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
     "react": "https://aistudiocdn.com/react@^19.2.1",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "three/": "https://aistudiocdn.com/three@^0.181.2/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
     "three": "https://aistudiocdn.com/three@^0.181.2",
-    "uuid": "https://aistudiocdn.com/uuid@^13.0.0"
+    "three/": "https://aistudiocdn.com/three@^0.181.2/"
   }
 }
 </script>
