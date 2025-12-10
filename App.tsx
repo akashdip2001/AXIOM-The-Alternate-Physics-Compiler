@@ -1,87 +1,86 @@
 import React, { useState, useCallback } from 'react';
-import Terminal from './components/Terminal';
-import ThreeViewport from './components/ThreeViewport';
-import { generateSimulationCode } from './services/geminiService';
-import { LogEntry, SimulationStatus } from './types';
+import { Terminal } from './components/Terminal';
+import { Viewport } from './components/Viewport';
+import { compileReality } from './services/geminiService';
+import { LogEntry, LogType } from './types';
+import { v4 as uuidv4 } from 'uuid'; // Actually we don't have uuid lib, let's make a simple helper
+
+// Simple ID generator since we can't add arbitrary packages easily
+const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const App: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([
-    { id: 'init', timestamp: new Date().toLocaleTimeString(), message: 'System initialized. Awaiting input.', type: 'system' }
+    {
+      id: generateId(),
+      timestamp: new Date().toLocaleTimeString(),
+      message: "System Online. AXIOM Kernel v2.5 initialized.",
+      type: LogType.SYSTEM
+    }
   ]);
-  const [status, setStatus] = useState<SimulationStatus>(SimulationStatus.IDLE);
-  const [simulationCode, setSimulationCode] = useState<string | null>(null);
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [activeCode, setActiveCode] = useState<string | null>(null);
 
-  const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
+  const addLog = (message: string, type: LogType = LogType.INFO) => {
     setLogs(prev => [...prev, {
-      id: Math.random().toString(36).substr(2, 9),
+      id: generateId(),
       timestamp: new Date().toLocaleTimeString(),
       message,
       type
     }]);
-  }, []);
+  };
 
-  const handleCompile = async (prompt: string) => {
-    if (!process.env.API_KEY) {
-      addLog('API Key not found in environment. Please configure process.env.API_KEY.', 'error');
-      setStatus(SimulationStatus.ERROR);
-      return;
-    }
-
-    setStatus(SimulationStatus.GENERATING);
-    addLog(`Processing input: "${prompt}"`, 'info');
-    addLog('Connecting to Gemini 3.0 Pro...', 'system');
+  const handleCompile = useCallback(async (prompt: string) => {
+    setIsCompiling(true);
+    addLog(`Initiating compilation sequence for: "${prompt}"`, LogType.INFO);
+    addLog("Interfacing with Neural Core (Gemini 2.5)...", LogType.SYSTEM);
 
     try {
-      const code = await generateSimulationCode(prompt);
+      const start = performance.now();
+      const code = await compileReality(prompt);
+      const end = performance.now();
       
-      addLog('Code generation successful.', 'success');
-      addLog('Compiling physics engine...', 'system');
+      addLog(`Matrix generated in ${((end - start) / 1000).toFixed(2)}s`, LogType.INFO);
+      addLog("Injecting runtime executable...", LogType.SYSTEM);
       
-      setStatus(SimulationStatus.COMPILING);
-      setSimulationCode(code); // This triggers the useEffect in ThreeViewport
-      
+      setActiveCode(code);
+      // Success log is handled by Viewport callback to ensure it actually runs
     } catch (error: any) {
-      setStatus(SimulationStatus.ERROR);
-      addLog(error.message || 'Unknown error occurred', 'error');
+      addLog(`Compilation Failed: ${error.message}`, LogType.ERROR);
+      setIsCompiling(false);
     }
+  }, []);
+
+  const handleViewportError = (error: string) => {
+    addLog(`Runtime Error: ${error}`, LogType.ERROR);
+    setIsCompiling(false);
   };
 
-  const handleSimulationError = (error: string) => {
-    setStatus(SimulationStatus.ERROR);
-    addLog(error, 'error');
-  };
-
-  const handleSimulationSuccess = () => {
-    setStatus(SimulationStatus.RUNNING);
-    addLog('Simulation running. Render loop active.', 'success');
+  const handleViewportSuccess = () => {
+    addLog("Reality successfully rendered.", LogType.SUCCESS);
+    setIsCompiling(false);
   };
 
   return (
-    <div className="flex w-screen h-screen overflow-hidden">
-      {/* Left Panel: 30% width */}
-      <div className="w-[30%] min-w-[350px] h-full">
+    <div className="flex w-full h-screen bg-axiom-black text-white font-sans overflow-hidden">
+      {/* Left Panel: Terminal (30% width on Desktop) */}
+      <div className="w-full md:w-[400px] lg:w-[450px] flex-shrink-0 h-full border-r border-white/5 relative z-20 shadow-[10px_0_30px_-5px_rgba(0,0,0,0.5)]">
         <Terminal 
           onCompile={handleCompile} 
-          logs={logs}
-          status={status}
+          logs={logs} 
+          isCompiling={isCompiling}
         />
       </div>
 
-      {/* Right Panel: 70% width */}
-      <div className="w-[70%] h-full relative">
-        <ThreeViewport 
-          code={simulationCode}
-          status={status}
-          onError={handleSimulationError}
-          onSuccess={handleSimulationSuccess}
+      {/* Right Panel: Viewport (Remaining width) */}
+      <div className="flex-1 h-full relative z-10">
+        <Viewport 
+          code={activeCode} 
+          onError={handleViewportError}
+          onSuccess={handleViewportSuccess}
         />
         
-        {/* Overlay Decoration */}
-        <div className="absolute top-4 right-4 text-[#00ff9f] opacity-50 font-mono text-xs pointer-events-none">
-          VIEWPORT_ACTIVE
-          <br/>
-          RENDERER: WEBGL2
-        </div>
+        {/* Overlay Gradient for better integration */}
+        <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-black via-black/50 to-transparent pointer-events-none" />
       </div>
     </div>
   );

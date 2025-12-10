@@ -1,19 +1,26 @@
+export enum LogType {
+  INFO = 'INFO',
+  SUCCESS = 'SUCCESS',
+  WARNING = 'WARNING',
+  ERROR = 'ERROR',
+  SYSTEM = 'SYSTEM'
+}
+
 export interface LogEntry {
   id: string;
   timestamp: string;
   message: string;
-  type: 'info' | 'success' | 'error' | 'system';
+  type: LogType;
+}
+
+export interface CompilationResult {
+  code: string;
+  success: boolean;
+  error?: string;
 }
 
 export interface SimulationConfig {
-  code: string;
-  timestamp: number;
-}
-
-export enum SimulationStatus {
-  IDLE = 'IDLE',
-  GENERATING = 'GENERATING',
-  COMPILING = 'COMPILING',
-  RUNNING = 'RUNNING',
-  ERROR = 'ERROR',
+  prompt: string;
+  generatedCode: string | null;
+  status: 'idle' | 'compiling' | 'active' | 'error';
 }
