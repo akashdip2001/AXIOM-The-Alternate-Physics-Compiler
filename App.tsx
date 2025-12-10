@@ -7,6 +7,7 @@ import { AppMode, TerminalLog } from './types';
 function App() {
   const [mode, setMode] = useState<AppMode>(AppMode.IDLE);
   const [code, setCode] = useState<string | null>(null);
+  const [simulationKey, setSimulationKey] = useState<number>(0);
   const [logs, setLogs] = useState<TerminalLog[]>([
     { id: 'init', type: 'system', message: 'AXIOM KERNEL INITIALIZED.', timestamp: Date.now() },
     { id: 'init2', type: 'info', message: 'Waiting for physics input parameters...', timestamp: Date.now() + 10 }
@@ -22,6 +23,10 @@ function App() {
   }, []);
 
   const handleCompile = async (prompt: string) => {
+    // 1. CLEANUP PHASE: Clear code and force remount
+    setCode(null); 
+    setSimulationKey(prev => prev + 1); // This triggers the "Destroy Global Variables" & "Clear Canvas" via unmount
+    
     setMode(AppMode.LOADING);
     addLog(`Analyzing input: "${prompt}"`, 'info');
     
@@ -57,6 +62,7 @@ function App() {
   const handleReset = () => {
     setMode(AppMode.IDLE);
     setCode(null);
+    setSimulationKey(prev => prev + 1); // Clear memory on reset too
     addLog('Memory cleared. Engine reset.', 'system');
   };
 
@@ -64,7 +70,9 @@ function App() {
     <div className="relative w-full h-screen bg-axiom-black overflow-hidden font-mono text-axiom-text selection:bg-axiom-cyan selection:text-axiom-black">
       
       {/* 3D Visualizer Layer */}
+      {/* key={simulationKey} forces a full Re-Init when key changes */}
       <Visualizer 
+        key={simulationKey}
         mode={mode} 
         codeString={code} 
         onError={handleError} 

@@ -132,20 +132,35 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
     };
     window.addEventListener('resize', handleResize);
 
-    // CLEANUP
+    // CLEANUP ROUTINE (Mandatory)
     return () => {
       window.removeEventListener('resize', handleResize);
+      
+      // 1. Clear DOM
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
       }
       
-      // Explicit Global Variable Destruction
+      // 2. Destroy Global Variables (to prevent collisions in next run)
       (window as any).scene = null;
       (window as any).camera = null;
       (window as any).renderer = null;
 
+      // 3. Dispose Three.js Memory
       renderer.dispose();
       renderer.forceContextLoss();
+      
+      // Dispose Scene objects
+      scene.traverse((object: any) => {
+          if (object.geometry) object.geometry.dispose();
+          if (object.material) {
+              if (Array.isArray(object.material)) {
+                  object.material.forEach((m: any) => m.dispose());
+              } else {
+                  object.material.dispose();
+              }
+          }
+      });
     };
   }, []);
 
@@ -165,6 +180,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
       // Cleanup visual artifacts and memory
       simulationGroupRef.current.clear();
       
+      // Helper to clean materials deeply
       const cleanMaterial = (material: any) => {
         material.dispose();
         if (material.map) material.map.dispose();
@@ -197,8 +213,8 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
       // Execute new code
       try {
         const createSimulation = new Function('THREE', 'scene', 'camera', 'renderer', codeString);
-        // CRITICAL: Pass simulationGroupRef.current as 'scene' so all objects are added to this group
-        // This allows us to scale/manipulate the entire simulation as a single unit
+        
+        // Pass simulationGroupRef.current as 'scene'
         const simInterface = createSimulation(THREE, simulationGroupRef.current, cameraRef.current, rendererRef.current);
         
         if (simInterface && typeof simInterface.update === 'function') {
@@ -233,18 +249,14 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
       const lerpFactor = 0.05;
 
       // 1. STARFIELD (IDLE)
-      // Target: Visible only in IDLE/LOADING
       const targetIdleOpacity = (mode === AppMode.IDLE || mode === AppMode.LOADING) ? 1 : 0;
       animState.current.idleOpacity = THREE.MathUtils.lerp(animState.current.idleOpacity, targetIdleOpacity, lerpFactor);
 
       if (idleGroup) {
-          // Optimization: hide if very low opacity
           idleGroup.visible = animState.current.idleOpacity > 0.01;
-          
           if (idleGroup.visible) {
              idleGroup.rotation.y += 0.0005;
              idleGroup.rotation.x += 0.0002;
-             // Apply opacity to points material
              const points = idleGroup.children[0] as THREE.Points;
              if (points && points.material) {
                  (points.material as THREE.PointsMaterial).opacity = 0.8 * animState.current.idleOpacity;
@@ -253,20 +265,15 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
       }
 
       // 2. PAUSED OVERLAY
-      // Target: Visible only in PAUSED
       const targetPausedOpacity = (mode === AppMode.PAUSED) ? 1 : 0;
       animState.current.pausedOpacity = THREE.MathUtils.lerp(animState.current.pausedOpacity, targetPausedOpacity, lerpFactor);
 
       if (pausedGroup) {
           pausedGroup.visible = animState.current.pausedOpacity > 0.01;
-          
           if (pausedGroup.visible) {
             pausedGroup.rotation.y -= 0.005;
             pausedGroup.rotation.z += 0.002;
-            
-            // Apply opacity to children
             pausedGroup.children.forEach((child, index) => {
-                // Outer wireframe (index 0) max 0.5, Inner core (index 1) max 0.3
                 const maxOp = index === 0 ? 0.5 : 0.3;
                 if ((child as THREE.Mesh).material) {
                     ((child as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = maxOp * animState.current.pausedOpacity;
@@ -276,14 +283,11 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
       }
 
       // 3. SIMULATION SCALE ("Big Bang" Effect)
-      // Target: 1 when ACTIVE or PAUSED, 0 otherwise
       const targetSimScale = (mode === AppMode.ACTIVE || mode === AppMode.PAUSED) ? 1 : 0;
-      // Use a slightly faster lerp for the "pop" in
       animState.current.simScale = THREE.MathUtils.lerp(animState.current.simScale, targetSimScale, 0.08);
 
       if (simulationGroup) {
           if (mode === AppMode.ACTIVE) {
-              // Only update physics when active
               if (simulationRef.current?.update) {
                   try {
                       simulationRef.current.update();
@@ -293,9 +297,8 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
               }
           }
           
-          // Apply Scale Transition
           const s = animState.current.simScale;
-          const safeScale = Math.max(0.001, s); // Avoid 0 scale matrix warnings
+          const safeScale = Math.max(0.001, s);
           simulationGroup.scale.set(safeScale, safeScale, safeScale);
       }
 
