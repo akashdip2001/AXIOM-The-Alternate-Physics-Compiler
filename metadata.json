@@ -1,5 +1,5 @@
 {
-  "name": "V3 AXIOM: The Alternate Physics Compiler",
-  "description": "A minimalist sci-fi environment that compiles natural language physics scenarios into photorealistic 3D visualizations using the Gemini API and Three.js.",
+  "name": "V4 AXIOM: The Alternate Physics Compiler",
+  "description": "A Generative AI environment that compiles natural language into interactive 3D physics simulations with scientific realism.",
   "requestFramePermissions": []
 }

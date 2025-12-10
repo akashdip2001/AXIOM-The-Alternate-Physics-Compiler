@@ -6,16 +6,18 @@
     <title>AXIOM: The Alternate Physics Compiler</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Inter:wght@300;400;600&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;600&family=Inter:wght@300;400;600&display=swap');
       
-      body {
+      body, html {
         margin: 0;
-        background-color: #000000;
-        font-family: 'Inter', sans-serif;
-        color: #e0e0e0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #000;
         overflow: hidden;
+        font-family: 'Inter', sans-serif;
       }
-      
+
       /* Custom Scrollbar for Terminal */
       ::-webkit-scrollbar {
         width: 6px;
@@ -28,20 +30,7 @@
         border-radius: 3px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.3);
-      }
-
-      .font-mono {
-        font-family: 'JetBrains Mono', monospace;
-      }
-
-      /* Glassmorphism Utilities */
-      .glass-panel {
-        background: rgba(10, 10, 12, 0.6);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        background: rgba(255, 255, 255, 0.4);
       }
     </style>
   <script type="importmap">
@@ -50,10 +39,10 @@
     "react": "https://aistudiocdn.com/react@^19.2.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
     "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
     "three": "https://aistudiocdn.com/three@^0.181.2",
-    "three/": "https://aistudiocdn.com/three@^0.181.2/"
+    "three/": "https://aistudiocdn.com/three@^0.181.2/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0"
   }
 }
 </script>

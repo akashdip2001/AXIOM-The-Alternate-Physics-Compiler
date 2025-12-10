@@ -1,5 +1,5 @@
 {
-  "name": "v3-axiom:-the-alternate-physics-compiler",
+  "name": "v4-axiom:-the-alternate-physics-compiler",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,9 +11,9 @@
   "dependencies": {
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
+    "three": "^0.181.2",
     "@google/genai": "^1.31.0",
-    "lucide-react": "^0.556.0",
-    "three": "^0.181.2"
+    "lucide-react": "^0.556.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

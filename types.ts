@@ -1,19 +1,31 @@
-export enum LogType {
-  INFO = 'INFO',
-  SUCCESS = 'SUCCESS',
-  WARNING = 'WARNING',
-  ERROR = 'ERROR',
-  SYSTEM = 'SYSTEM'
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+
+// The shape of the object returned by the generated code
+export interface SimulationModule {
+  update: (time: number, delta: number) => void;
+  cleanup: () => void;
 }
 
-export interface LogMessage {
+// The signature of the function we create from the string
+export type GeneratedFunction = (
+  scene: THREE.Scene,
+  camera: THREE.PerspectiveCamera,
+  renderer: THREE.WebGLRenderer,
+  controls: OrbitControls,
+  THREE_LIB: typeof THREE
+) => SimulationModule;
+
+export type LogEntry = {
   id: string;
   timestamp: string;
-  type: LogType;
   message: string;
-}
+  type: 'info' | 'success' | 'error' | 'system';
+};
 
-export interface GenerationResult {
-  code: string;
-  explanation?: string;
+export enum AppState {
+  IDLE = 'IDLE',
+  COMPILING = 'COMPILING',
+  RUNNING = 'RUNNING',
+  ERROR = 'ERROR',
 }

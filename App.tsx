@@ -1,130 +1,92 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Visualizer } from './components/Scene/Visualizer';
-import { Terminal } from './components/UI/Terminal';
-import { Button } from './components/UI/Button';
-import { LogMessage, LogType } from './types';
-import { generatePhysicsCode } from './services/geminiService';
-import { INITIAL_CODE } from './constants';
-import { Play, RotateCw } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import Visualizer from './components/Visualizer';
+import Terminal from './components/Terminal';
+import { compileSimulation } from './services/geminiService';
+import { LogEntry, AppState } from './types';
+
+const INITIAL_CODE = `
+// Welcome to AXIOM
+// Initializing Empty Void...
+
+const geometry = new THREE.IcosahedronGeometry(1, 1);
+const material = new THREE.MeshStandardMaterial({ 
+  color: 0xffffff, 
+  wireframe: true,
+  emissive: 0x444444
+});
+const sphere = new THREE.Mesh(geometry, material);
+scene.add(sphere);
+
+const light = new THREE.PointLight(0x00ffcc, 2, 100);
+light.position.set(5, 5, 5);
+scene.add(light);
+scene.add(new THREE.AmbientLight(0x404040));
+
+function update(time, delta) {
+  sphere.rotation.x += delta * 0.2;
+  sphere.rotation.y += delta * 0.1;
+  sphere.scale.setScalar(1 + Math.sin(time) * 0.1);
+}
+
+function cleanup() {
+  scene.remove(sphere);
+  scene.remove(light);
+  geometry.dispose();
+  material.dispose();
+}
+
+return { update, cleanup };
+`;
 
 const App: React.FC = () => {
-  const [code, setCode] = useState<string>(INITIAL_CODE);
-  const [inputValue, setInputValue] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [logs, setLogs] = useState<LogMessage[]>([]);
+  const [simulationCode, setSimulationCode] = useState<string | null>(INITIAL_CODE);
+  const [logs, setLogs] = useState<LogEntry[]>([{
+    id: 'init',
+    timestamp: new Date().toLocaleTimeString(),
+    message: 'System Initialized. Awaiting Input.',
+    type: 'system'
+  }]);
+  const [appState, setAppState] = useState<AppState>(AppState.IDLE);
 
-  // Add a log message
-  const addLog = useCallback((type: LogType, message: string) => {
-    const newLog: LogMessage = {
-      id: Math.random().toString(36).substr(2, 9),
-      timestamp: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      type,
-      message
-    };
-    setLogs(prev => [...prev, newLog]);
+  const addLog = useCallback((message: string, type: 'info' | 'success' | 'error' | 'system') => {
+    setLogs(prev => [...prev, {
+      id: Math.random().toString(36).substring(7),
+      timestamp: new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second:'2-digit' }),
+      message,
+      type
+    }]);
   }, []);
 
-  // Initial greeting
-  useEffect(() => {
-    addLog(LogType.SYSTEM, "AXIOM Kernel initialized.");
-    addLog(LogType.INFO, "Rendering engine online: Three.js r" + React.version); // React version placeholder
-    addLog(LogType.INFO, "Awaiting instructions...");
-  }, [addLog]);
-
-  const handleCompile = async () => {
-    if (!inputValue.trim() || isProcessing) return;
-
-    setIsProcessing(true);
-    addLog(LogType.SYSTEM, `Compiling: "${inputValue}"`);
+  const handleCompile = async (prompt: string) => {
+    setAppState(AppState.COMPILING);
+    addLog(`Compiling query: "${prompt}"...`, 'info');
 
     try {
-      const generatedCode = await generatePhysicsCode(inputValue);
-      
-      addLog(LogType.SUCCESS, "Code generation successful.");
-      addLog(LogType.INFO, "Injecting runtime logic...");
-      
-      setCode(generatedCode);
-      // Success log for runtime execution happens in Visualizer callback
-      setInputValue(''); // Clear input on success
-      
+      const code = await compileSimulation(prompt);
+      setSimulationCode(code);
+      setAppState(AppState.RUNNING);
     } catch (error: any) {
-      addLog(LogType.ERROR, `Compilation failed: ${error.message}`);
-      setIsProcessing(false);
+      setAppState(AppState.ERROR);
+      addLog(error.message || 'Unknown compilation error', 'error');
     }
   };
 
-  const handleRuntimeSuccess = useCallback(() => {
-    addLog(LogType.SUCCESS, "Simulation running.");
-    setIsProcessing(false);
-  }, [addLog]);
-
-  const handleRuntimeError = useCallback((error: string) => {
-    addLog(LogType.ERROR, `Runtime Exception: ${error}`);
-    setIsProcessing(false);
-  }, [addLog]);
-
-  const handleReset = () => {
-    setCode(INITIAL_CODE);
-    addLog(LogType.SYSTEM, "System reset to default state.");
-  };
-
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden selection:bg-orange-500/30 selection:text-orange-200">
+    <div className="relative w-screen h-screen bg-black overflow-hidden selection:bg-emerald-500/30">
       
-      {/* 3D Layer (Z-0) */}
+      {/* Background Visualization Layer */}
       <Visualizer 
-        code={code} 
-        onCodeExecuted={handleRuntimeSuccess}
-        onError={handleRuntimeError}
+        simulationCode={simulationCode} 
+        onLog={(msg, type) => addLog(msg, type)}
       />
 
-      {/* UI Overlay Layer (Z-10) */}
-      {/* pointer-events-none ensures clicks pass through to the canvas where there are no UI elements */}
-      <div className="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-6 md:p-12">
-        
-        {/* Top Bar: Logo & Reset */}
-        <div className="flex justify-between items-start pointer-events-auto">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tighter text-white mix-blend-difference mb-1">AXIOM</h1>
-            <p className="text-[10px] text-gray-400 font-mono tracking-widest uppercase opacity-70">Alternate Physics Compiler</p>
-          </div>
-          
-          <Button variant="secondary" onClick={handleReset} icon={<RotateCw size={14} />}>
-            Reset
-          </Button>
-        </div>
-
-        {/* Bottom Bar: Terminal & Action */}
-        <div className="flex flex-col md:flex-row items-end gap-6 pointer-events-auto">
-          
-          {/* Terminal Component */}
-          <Terminal 
-            logs={logs}
-            inputValue={inputValue}
-            onInputChange={setInputValue}
-            onSubmit={handleCompile}
-            isProcessing={isProcessing}
-          />
-
-          {/* Compile Button (Mobile: Full width, Desktop: Auto) */}
-          <div className="w-full md:w-auto">
-            <Button 
-              variant="primary" 
-              onClick={handleCompile} 
-              isLoading={isProcessing}
-              disabled={!inputValue.trim()}
-              className="w-full md:w-auto h-14 md:h-auto shadow-[0_0_40px_rgba(255,255,255,0.2)]"
-              icon={<Play size={16} fill="currentColor" />}
-            >
-              Compile Reality
-            </Button>
-          </div>
-
-        </div>
-      </div>
-
-      {/* Aesthetic Overlays (Optional Vignette/Grain) */}
-      <div className="absolute inset-0 z-20 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]" />
+      {/* Foreground UI Layer */}
+      <Terminal 
+        logs={logs}
+        appState={appState}
+        onCompile={handleCompile}
+      />
+      
     </div>
   );
 };
