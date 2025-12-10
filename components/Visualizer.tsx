@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { AppMode } from '../types';
@@ -27,9 +27,18 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
 
   // Logic Refs
   const simulationRef = useRef<SimulationInterface | null>(null);
+  
+  // Group Refs - separate containers for managing transitions
   const idleGroupRef = useRef<THREE.Group | null>(null);
   const pausedGroupRef = useRef<THREE.Group | null>(null);
-  const overlayPlaneRef = useRef<THREE.Mesh | null>(null);
+  const simulationGroupRef = useRef<THREE.Group | null>(null);
+
+  // Animation State Refs (for smooth transitions without re-renders)
+  const animState = useRef({
+    idleOpacity: 1,
+    pausedOpacity: 0,
+    simScale: 0
+  });
 
   // Initialize Three.js
   useEffect(() => {
@@ -78,34 +87,35 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
     scene.add(idleGroup);
     idleGroupRef.current = idleGroup;
 
+    // --- STATE B: SIMULATION GROUP ---
+    // This group will act as the "scene" for the generated code
+    const simulationGroup = new THREE.Group();
+    simulationGroup.scale.setScalar(0); // Start hidden/collapsed
+    scene.add(simulationGroup);
+    simulationGroupRef.current = simulationGroup;
+
     // --- STATE C: PAUSED GROUP (Wireframe Sphere & Overlay) ---
     const pausedGroup = new THREE.Group();
-    pausedGroup.visible = false;
+    pausedGroup.visible = false; // Initially hidden
     
-    // Dark Overlay (Plane covering camera view)
-    // Note: We'll manually position this in front of camera each frame or just put it in the group
-    // Ideally, for the "dark layer", we can just use a fullscreen quad, but let's use a big sphere surrounding the center for simplicity in scene space, 
-    // or better, a UI HTML overlay. The prompt asks for "Overlay a semi-transparent dark layer... Render on top: An abstract, rotating Wireframe Sphere".
-    // Let's do the Sphere in Three.js and the Dark Layer in CSS/HTML to avoid depth sorting issues with the frozen scene.
-    // So `pausedGroup` only contains the Wireframe Sphere.
-    
+    // Wireframe Sphere
     const wireGeo = new THREE.IcosahedronGeometry(2, 2);
     const wireMat = new THREE.MeshBasicMaterial({ 
       color: 0x00f3ff, 
       wireframe: true, 
       transparent: true, 
-      opacity: 0.5 
+      opacity: 0 // Start invisible for fade in
     });
     const wireSphere = new THREE.Mesh(wireGeo, wireMat);
     pausedGroup.add(wireSphere);
     
-    // Add an inner glowing core for aesthetics
+    // Inner glowing core
     const coreGeo = new THREE.IcosahedronGeometry(1, 1);
     const coreMat = new THREE.MeshBasicMaterial({
       color: 0x00ff9d,
       wireframe: true,
       transparent: true,
-      opacity: 0.3
+      opacity: 0 // Start invisible
     });
     const coreSphere = new THREE.Mesh(coreGeo, coreMat);
     pausedGroup.add(coreSphere);
@@ -128,14 +138,20 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
       }
+      
+      // Explicit Global Variable Destruction
+      (window as any).scene = null;
+      (window as any).camera = null;
+      (window as any).renderer = null;
+
       renderer.dispose();
-      // Dispose other resources as needed
+      renderer.forceContextLoss();
     };
   }, []);
 
-  // Handle Code Execution (State A -> B or C -> B)
+  // Handle Code Execution
   useEffect(() => {
-    if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return;
+    if (!sceneRef.current || !cameraRef.current || !rendererRef.current || !simulationGroupRef.current) return;
 
     if (mode === AppMode.LOADING || mode === AppMode.IDLE) {
       // Cleanup previous sim if exists
@@ -145,18 +161,49 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
         } catch(e) { console.error("Cleanup error", e); }
         simulationRef.current = null;
       }
+      
+      // Cleanup visual artifacts and memory
+      simulationGroupRef.current.clear();
+      
+      const cleanMaterial = (material: any) => {
+        material.dispose();
+        if (material.map) material.map.dispose();
+        if (material.lightMap) material.lightMap.dispose();
+        if (material.bumpMap) material.bumpMap.dispose();
+        if (material.normalMap) material.normalMap.dispose();
+        if (material.specularMap) material.specularMap.dispose();
+        if (material.envMap) material.envMap.dispose();
+      };
+
+      simulationGroupRef.current.traverse((object: any) => {
+          if (object.isMesh || object.isPoints || object.isLine) {
+              if (object.geometry) object.geometry.dispose();
+              if (object.material) {
+                  if (object.material.isMaterial) {
+                      cleanMaterial(object.material);
+                  } else if (Array.isArray(object.material)) {
+                      object.material.forEach(cleanMaterial);
+                  }
+              }
+          }
+      });
+      
+      // Reset scale for animation
+      animState.current.simScale = 0; 
+      simulationGroupRef.current.scale.setScalar(0);
     }
 
     if (mode === AppMode.ACTIVE && codeString && !simulationRef.current) {
       // Execute new code
       try {
         const createSimulation = new Function('THREE', 'scene', 'camera', 'renderer', codeString);
-        const simInterface = createSimulation(THREE, sceneRef.current, cameraRef.current, rendererRef.current);
+        // CRITICAL: Pass simulationGroupRef.current as 'scene' so all objects are added to this group
+        // This allows us to scale/manipulate the entire simulation as a single unit
+        const simInterface = createSimulation(THREE, simulationGroupRef.current, cameraRef.current, rendererRef.current);
         
         if (simInterface && typeof simInterface.update === 'function') {
           simulationRef.current = simInterface;
         } else {
-            // Fallback if no interface returned but code ran
            simulationRef.current = { update: () => {}, cleanup: () => {} };
         }
       } catch (err: any) {
@@ -174,6 +221,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
 
       const idleGroup = idleGroupRef.current;
       const pausedGroup = pausedGroupRef.current;
+      const simulationGroup = simulationGroupRef.current;
       const controls = controlsRef.current;
       const renderer = rendererRef.current;
       const scene = sceneRef.current;
@@ -181,38 +229,74 @@ const Visualizer: React.FC<VisualizerProps> = ({ mode, codeString, onError }) =>
 
       controls.update();
 
-      // State Machine Logic for Visuals
-      if (mode === AppMode.IDLE || mode === AppMode.LOADING) {
-        if (idleGroup) {
-            idleGroup.visible = true;
-            idleGroup.rotation.y += 0.0005;
-            idleGroup.rotation.x += 0.0002;
-        }
-        if (pausedGroup) pausedGroup.visible = false;
-        
-      } else if (mode === AppMode.ACTIVE) {
-        if (idleGroup) idleGroup.visible = false;
-        if (pausedGroup) pausedGroup.visible = false;
+      // --- ANIMATION TRANSITION LOGIC ---
+      const lerpFactor = 0.05;
 
-        // Run generated physics
-        if (simulationRef.current?.update) {
-            try {
-                simulationRef.current.update();
-            } catch(e) {
-                console.error("Simulation Runtime Error", e);
-            }
-        }
+      // 1. STARFIELD (IDLE)
+      // Target: Visible only in IDLE/LOADING
+      const targetIdleOpacity = (mode === AppMode.IDLE || mode === AppMode.LOADING) ? 1 : 0;
+      animState.current.idleOpacity = THREE.MathUtils.lerp(animState.current.idleOpacity, targetIdleOpacity, lerpFactor);
 
-      } else if (mode === AppMode.PAUSED) {
-        if (idleGroup) idleGroup.visible = false;
-        if (pausedGroup) {
-            pausedGroup.visible = true;
-            // Rotate the wireframe sphere
+      if (idleGroup) {
+          // Optimization: hide if very low opacity
+          idleGroup.visible = animState.current.idleOpacity > 0.01;
+          
+          if (idleGroup.visible) {
+             idleGroup.rotation.y += 0.0005;
+             idleGroup.rotation.x += 0.0002;
+             // Apply opacity to points material
+             const points = idleGroup.children[0] as THREE.Points;
+             if (points && points.material) {
+                 (points.material as THREE.PointsMaterial).opacity = 0.8 * animState.current.idleOpacity;
+             }
+          }
+      }
+
+      // 2. PAUSED OVERLAY
+      // Target: Visible only in PAUSED
+      const targetPausedOpacity = (mode === AppMode.PAUSED) ? 1 : 0;
+      animState.current.pausedOpacity = THREE.MathUtils.lerp(animState.current.pausedOpacity, targetPausedOpacity, lerpFactor);
+
+      if (pausedGroup) {
+          pausedGroup.visible = animState.current.pausedOpacity > 0.01;
+          
+          if (pausedGroup.visible) {
             pausedGroup.rotation.y -= 0.005;
             pausedGroup.rotation.z += 0.002;
             
-            // Note: We do NOT call simulationRef.current.update() here, creating the "Freeze" effect.
-        }
+            // Apply opacity to children
+            pausedGroup.children.forEach((child, index) => {
+                // Outer wireframe (index 0) max 0.5, Inner core (index 1) max 0.3
+                const maxOp = index === 0 ? 0.5 : 0.3;
+                if ((child as THREE.Mesh).material) {
+                    ((child as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = maxOp * animState.current.pausedOpacity;
+                }
+            });
+          }
+      }
+
+      // 3. SIMULATION SCALE ("Big Bang" Effect)
+      // Target: 1 when ACTIVE or PAUSED, 0 otherwise
+      const targetSimScale = (mode === AppMode.ACTIVE || mode === AppMode.PAUSED) ? 1 : 0;
+      // Use a slightly faster lerp for the "pop" in
+      animState.current.simScale = THREE.MathUtils.lerp(animState.current.simScale, targetSimScale, 0.08);
+
+      if (simulationGroup) {
+          if (mode === AppMode.ACTIVE) {
+              // Only update physics when active
+              if (simulationRef.current?.update) {
+                  try {
+                      simulationRef.current.update();
+                  } catch(e) {
+                      console.error("Simulation Runtime Error", e);
+                  }
+              }
+          }
+          
+          // Apply Scale Transition
+          const s = animState.current.simScale;
+          const safeScale = Math.max(0.001, s); // Avoid 0 scale matrix warnings
+          simulationGroup.scale.set(safeScale, safeScale, safeScale);
       }
 
       renderer.render(scene, camera);
