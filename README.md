@@ -6,7 +6,9 @@
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1rvStHu2Bs-rhMydKb_FBWg_rtgZwtADD
+- View your app in AI Studio: https://ai.studio/apps/drive/1rvStHu2Bs-rhMydKb_FBWg_rtgZwtADD
+- YouTube video: https://youtu.be/U_TYrZDuCjg
+- Kaggle: https://kaggle.com/competitions/gemini-3/writeups/axiom-the-alternate-physics-compiler
 
 ## Run Locally
 
